@@ -1,11 +1,29 @@
-chart = {
+function(instance, properties, context) {
+
+    var container = instance.data.container;
+         container.css({
+            height: `${properties.area_height}px`,
+            width: `${properties.area_width}px`
+        });
+    
+    const data = [
+        { date: new Date("2020-01-01"), industry: "Technology", unemployed: 1500 },
+        { date: new Date("2020-02-01"), industry: "Technology", unemployed: 1800 },
+        { date: new Date("2020-01-01"), industry: "Healthcare", unemployed: 1200 },
+        { date: new Date("2020-02-01"), industry: "Healthcare", unemployed: 1600 },
+        // Daha fazla veri eklenebilir...
+    ];
+    
+    
+    
+   const chart = () => {
   // Specify the chart’s dimensions.
-  const width = 928;
-  const height = 500;
-  const marginTop = 10;
-  const marginRight = 10;
-  const marginBottom = 20;
-  const marginLeft = 40;
+  const width = properties.area_width;
+        const height = properties.area_height;
+        const marginTop = 10;
+        const marginRight = 10;
+        const marginBottom = 20;
+        const marginLeft = 40;
 
   // Determine the series that need to be stacked.
   const series = d3.stack()
@@ -74,4 +92,9 @@ chart = {
 
   // Return the chart with the color scale as a property (for the legend).
   return Object.assign(svg.node(), {scales: {color}});
+}
+   
+            container.html(''); 
+            container.append(chart());
+
 }
