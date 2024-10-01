@@ -1,0 +1,162 @@
+function(instance, properties, context) {
+    
+    var schemeContainer = instance.data.schemeContainer;
+    var container = instance.data.container;
+    var bandContainer = instance.data.bandContainer;
+    
+    // Container boyutlarını ayarlama
+    container.css({
+        height: `${properties.area_height}px`,
+        width: `${properties.area_width}px`
+    });
+    
+    // Renk şemalarını tanımlama
+    const colorSchemes = new Map([
+        ["Blues", d3.schemeBlues],
+        ["Greens", d3.schemeGreens],
+        ["Reds", d3.schemeReds],
+        ["Purples", d3.schemePurples]
+    ]);
+
+    // Chart fonksiyonu, colorScheme ve bands parametreleri alacak
+    const chart = (colorScheme, bands) => {
+        const dates = properties.date.get(0, properties.date.length());
+        const names = properties.name.get(0, properties.name.length());
+        const values = properties.value1.get(0, properties.value1.length());
+
+        // Veri dizilerinin tutarlılığı kontrolü
+        if (dates.length !== names.length || names.length !== values.length) {
+            console.error("Data arrays have inconsistent lengths.");
+            return;
+        }
+
+        const data = dates.map((date, index) => ({
+            date: new Date(date),
+            name: names[index],
+            value: values[index]
+        }));
+
+        const series = Array.from(d3.group(data, d => d.name).values())
+            .map(group => group.sort((a, b) => a.date - b.date));
+
+        const margin = { top: 30, right: 10, bottom: 0, left: 10 };
+        const width = properties.area_width + 200;
+        const size = 25;
+        const height = series.length * size + margin.top + margin.bottom + 100;  
+        const padding = 1;
+
+        // Default bands değeri (kontrol edildi)
+       // bands değişkeninin kontrolü
+        bands = Math.max(3, Math.min(bands || 9, 9));  // bands değeri 3 ile 7 arasında sınırlanacak
+
+// Renk şeması seçimi ve kontroller
+  //   const colors = colorSchemes[Math.max(3, bands)].slice(Math.max(0, 3 - bands));
+        
+          const colors = colorSchemes.get(colorScheme);
+if (!colors) {
+    console.error("Renk şeması bulunamadı.");
+    return;
+}   
+
+// Burada renk şemasına göre band aralığını sınırlayalım
+if (!colors[bands] || bands < 3 || bands > 9) {
+    console.error(`Geçersiz band sayısı: ${bands}. Band sayısı 3 ile 7 arasında olmalı.`);
+    return;
+}
+
+// Diğer grafik çizim işlemleri...
+
+
+        const x = d3.scaleUtc()
+    .domain(d3.extent(data, d => d.date))  // Veri tarih aralığını genişletir
+    .range([0, width]);  // Yeni genişliğe ölçekler
+        
+        
+        
+        const y = d3.scaleLinear()
+    .domain([0, d3.max(data, d => d.value)])
+    .range([size, size -  bands * (size - padding)]);  // Dinamik genişleme sağlandı
+
+
+
+    /*    const y = d3.scaleLinear()
+    .domain([0, d3.max(data, d => d.value)])  // Verinin maksimum değeriyle ilişkilendirilmiş domain
+    .range([size, size - (bands * (size - padding) - 50) + bands * 4]);  // Daha yüksek bands değerlerinde aralığı genişlet
+  // Dinamik genişleme sağlandı
+                                         */
+
+
+        const area = d3.area()
+            .defined(d => !isNaN(d.value))
+            .x(d => x(d.date))
+            .y0(size)
+            .y1(d => y(d.value));
+
+        const uid = `O-${Math.random().toString(16).slice(2)}`;
+
+        const svg = d3.create("svg")
+            .attr("width", width + margin.left + margin.right)
+            .attr("height", height + margin.top + margin.bottom)
+            .attr("viewBox", [0, 0, width + margin.left + margin.right, height + margin.top + margin.bottom])
+            .attr("style", "max-width: 100%; height: auto; font: 10px sans-serif;");
+
+        const g = svg.append("g")
+            .selectAll("g")
+            .data(series)
+            .join("g")
+            .attr("transform", (d, i) => `translate(0,${i * size + margin.top})`);
+
+        g.append("defs").append("clipPath")
+            .attr("id", (_, i) => `${uid}-clip-${i}`)
+            .append("rect")
+            .attr("width", width)
+            .attr("height", size - padding);
+
+        g.append("path")
+            .attr("d", d => area(d))
+            .attr("fill", (_, i) => colors[bands][i % colors[bands].length])
+            .attr("clip-path", (_, i) => `url(#${uid}-clip-${i})`);
+
+        g.append("text")
+            .attr("x", 4)
+            .attr("y", (size + padding) / 2)
+            .attr("dy", "0.35em")
+            .text(d => d[0].name);
+
+        svg.append("g")
+            .attr("transform", `translate(0,${margin.top})`)
+            .call(d3.axisTop(x).ticks(width / 80).tickSizeOuter(0))
+            .call(g => g.selectAll(".tick").filter(d => x(d) < margin.left || x(d) >= width - margin.right).remove())
+            .call(g => g.select(".domain").remove());
+
+        return svg.node();
+    };
+
+    const colorSchemeSelect = document.getElementById("colorScheme");
+    const bandInput = document.getElementById("bandInput");
+
+    if (colorSchemeSelect && bandInput) {
+        // Renk şeması değiştiğinde
+        colorSchemeSelect.addEventListener("change", function() {
+            const selectedScheme = this.value;
+            const bands = parseInt(bandInput.value, 10);
+            container.html(''); // Container temizliği
+            container.append(chart(selectedScheme, bands)); // Yeni grafiği çiz
+        });
+
+        // Bant sayısı değiştiğinde
+        bandInput.addEventListener("input", function() {
+            const selectedScheme = colorSchemeSelect.value || "Blues";
+            const bands = parseInt(this.value, 10);
+            container.html(''); // Container temizliği
+            container.append(chart(selectedScheme, bands)); // Yeni grafiği çiz
+        });
+
+        // İlk render
+        const initialBands = parseInt(bandInput.value, 10);
+        container.html(''); // İlk render için temizlik
+        container.append(chart(colorSchemeSelect.value || "Blues", !isNaN(initialBands) ? initialBands : 7));
+    } else {
+        console.error("colorScheme veya bandsInput seçici bulunamadı.");
+    }
+}
