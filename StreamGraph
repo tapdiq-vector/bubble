@@ -6,19 +6,26 @@ function(instance, properties, context) {
             width: `${properties.area_width}px`
         });
     
-    const data = [
-        { date: new Date("2020-01-01"), industry: "Technology", unemployed: 1500 },
-        { date: new Date("2020-02-01"), industry: "Technology", unemployed: 1800 },
-        { date: new Date("2020-01-01"), industry: "Healthcare", unemployed: 1200 },
-        { date: new Date("2020-02-01"), industry: "Healthcare", unemployed: 1600 },
-        // Daha fazla veri eklenebilir...
-    ];
-    
     
     
    const chart = () => {
+       
+       const date = properties.date.get(0, properties.date.length());
+        const industry = properties.industry.get(0, properties.industry.length());
+        const unemployed = properties.unemployed.get(0, properties.unemployed.length());
+
+       
+        const data = date.map((eDate, index) => ({
+            date: eDate,
+            industry: industry[index],
+            unemployed: unemployed[index]
+        }));
+       
+       
+       
+       
   // Specify the chart’s dimensions.
-  const width = properties.area_width;
+        const width = properties.area_width;
         const height = properties.area_height;
         const marginTop = 10;
         const marginRight = 10;
