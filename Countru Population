@@ -1,0 +1,142 @@
+
+// Örnek zaman serisi verileri
+const data = [
+  {date: new Date(2023, 0, 1), state1: 0.1, state2: 0.3, state3: 0.4},
+  {date: new Date(2023, 1, 1), state1: 0.15, state2: 0.35, state3: 0.45},
+  {date: new Date(2023, 2, 1), state1: 0.2, state2: 0.4, state3: 0.5},
+  {date: new Date(2023, 3, 1), state1: 0.25, state2: 0.45, state3: 0.55},
+  {date: new Date(2023, 4, 1), state1: 0.3, state2: 0.5, state3: 0.6}
+];
+
+// 'series' - Data'dan yığma alan grafiği için seriler oluşturma
+const series = [
+  {
+    key: "state1",
+    values: data.map(d => [d.state1, d.state1 + 0.1, d]) // state1 için düşük/yüksek değerler
+  },
+  {
+    key: "state2",
+    values: data.map(d => [d.state2, d.state2 + 0.1, d]) // state2 için düşük/yüksek değerler
+  },
+  {
+    key: "state3",
+    values: data.map(d => [d.state3, d.state3 + 0.1, d]) // state3 için düşük/yüksek değerler
+  }
+];
+
+// Bölge sıralaması (sadece renkleri düzenlemek için)
+const regionRank = ["state1", "state2", "state3"];
+
+// State'leri bölgelere göre haritalama
+const regionByState = new Map([
+  ["state1", "Region 1"],
+  ["state2", "Region 2"],
+  ["state3", "Region 3"]
+]);
+
+// Chart fonksiyonunu çağırma
+const chart = createChart(data, series, regionRank, regionByState);
+
+// Grafiği sayfaya ekleme (HTML içinde bir konteynır gereklidir)
+document.body.appendChild(chart);
+
+
+
+function createChart(data, series, regionRank, regionByState) {
+  // Chart boyutları ve marjinler
+  const width = 928;
+  const height = 720;
+  const marginTop = 10;
+  const marginRight = 10;
+  const marginBottom = 30;
+  const marginLeft = 40;
+  
+  // X ekseni için scale (UTC zamanı bazlı)
+  const x = d3.scaleUtc()
+      .domain(d3.extent(data, d => d.date)) // data.date'e göre domain
+      .range([marginLeft, width - marginRight]);
+
+  // Y ekseni için scale
+  const y = d3.scaleLinear()
+      .domain([0, d3.max(series, s => d3.max(s, d => d[1]))]) // En büyük değeri bulmak için
+      .range([height - marginBottom, marginTop]);
+  
+  // Renkler için ordinal scale
+  const color = d3.scaleOrdinal()
+      .domain(regionRank)  // bölge sıralamasına göre
+      .range(d3.schemeCategory10)
+      .unknown("gray");
+
+  // SVG container oluşturma
+  const svg = d3.create("svg")
+      .attr("width", width)
+      .attr("height", height)
+      .attr("viewBox", [0, 0, width, height])
+      .attr("style", "max-width: 100%; height: auto;");
+
+  // Alanları oluşturma (area chart)
+  const area = d3.area()
+      .x(d => x(d.data.date))
+      .y0(d => y(d[0]))
+      .y1(d => y(d[1]));
+
+  svg.append("g")
+      .attr("fill-opacity", 0.8)
+    .selectAll("path")
+    .data(series)
+    .join("path")
+      .attr("fill", ({key}) => color(regionByState.get(key))) // Her eyaletin rengi
+      .attr("d", area)
+    .append("title")
+      .text(({key}) => key); // Tooltip ekleme
+
+  // Orta çizgiyi oluşturma (midline)
+  const midline = d3.line()
+      .curve(d3.curveBasis)  // smooth line
+      .x(d => x(d.data.date))
+      .y(d => y((d[0] + d[1]) / 2));  // Yarıya alma
+
+  svg.append("g")
+      .attr("fill", "none")
+      .attr("stroke-width", 0.75)
+    .selectAll("path")
+    .data(series)
+    .join("path")
+      .attr("stroke", ({key}) => d3.lab(color(regionByState.get(key))).darker()) // Daha koyu çizgi rengi
+      .attr("d", midline); // Çizgiyi ekleme
+
+  // Text path oluşturma
+  svg.append("defs")
+    .selectAll("path")
+    .data(series)
+    .join("path")
+      .attr("id", d => (d.id = DOM.uid("state")).id)
+      .attr("d", midline);  // Orta çizgiye text path ekleme
+
+  // Etiketleri ekleme
+  svg.append("g")
+      .style("font", "10px sans-serif")
+      .attr("text-anchor", "middle")
+    .selectAll("text")
+    .data(series)
+    .join("text")
+      .attr("dy", "0.35em")
+    .append("textPath")
+      .attr("href", d => d.id.href)
+      .attr("startOffset", d => `${Math.max(0.05, Math.min(0.95, d.offset = d3.maxIndex(d, d => d[1] - d[0]) / (d.length - 1))) * 100}%`)
+      .text(d => d.key);  // Label ekleme
+
+  // X ekseni
+  svg.append("g")
+      .attr("transform", `translate(0,${height - marginBottom})`)
+      .call(d3.axisBottom(x).ticks(width / 80).tickSizeOuter(0));
+
+  // Y ekseni
+  svg.append("g")
+      .attr("transform", `translate(${marginLeft},0)`)
+      .call(d3.axisLeft(y).ticks(10, "%"))
+      .call(g => g.select(".domain").remove());
+
+  // Son olarak svg'i döndür
+  return Object.assign(svg.node(), {scales: {color}});
+}
