@@ -1,22 +1,26 @@
-const chart = (data, width) => {
-
-  // Specify the chart’s dimensions.
+const chart = () => {
   const marginTop = 30;
   const marginRight = 10;
   const marginBottom = 0;
   const marginLeft = 10;
   const step = 29;
+  
+  const data = [
+    [30, 50, 80, 20, 60], // Örnek veri
+    [15, 25, 40, 75, 35],
+    [70, 85, 30, 50, 90]
+  ]; // 3 veri seti, her biri birkaç sayı içeriyor.
+  
+  const width = 500; // Grafik genişliği sabitlenmiş
   const height = data.length * (step + 1) + marginTop + marginBottom;
 
-  const bands = 3; // örnek bir değer
-  const scheme = d3.schemeCategory10; // renk paleti
+  const bands = 3; // Kaç bant çizileceği
+  const scheme = d3.schemeCategory10; // D3'ün varsayılan renk paleti
 
-  // Create the scales.
   const x = d3.scaleTime().range([0, width]);
-  const y = d3.scaleLinear().rangeRound([0, -bands * step]);
-  const color = i => scheme[Math.max(3, bands)][i + Math.max(0, 3 - bands)];
+  const y = d3.scaleLinear().range([0, bands * step]);
+  const color = i => scheme[i % scheme.length]; // Renk paleti fonksiyonu
 
-  // Create the container and append a canvas for each series.
   const div = d3.create("div").style("position", "relative");
 
   const canvas = div.selectAll("canvas")
@@ -30,18 +34,15 @@ const chart = (data, width) => {
       .property("context", function() { return this.getContext("2d"); })
       .each(horizon);
 
-  // Create a SVG container for the axis and the interaction.
   const svg = div.append("svg")
       .attr("width", width)
       .attr("height", height)
       .style("position", "relative")
       .style("font", "10px sans-serif");
 
-  // Create a container for the axis.
   const gX = svg.append("g")
       .attr("transform", `translate(0,${marginTop})`);
 
-  // Create the y axis.
   svg.append("g")
     .selectAll("text")
     .data(data)
@@ -49,9 +50,8 @@ const chart = (data, width) => {
       .attr("x", 4)
       .attr("y", (d, i) => (i + 0.5) * (step + 1) + marginTop)
       .attr("dy", "0.35em")
-      .text((d, i) => i);
+      .text((d, i) => `Veri ${i + 1}`);
 
-  // Create a moving rule that follows the mouse.
   const rule = svg.append("line")
       .attr("stroke", "#000")
       .attr("y1", marginTop - 6)
@@ -60,32 +60,40 @@ const chart = (data, width) => {
       .attr("x2", 0.5);
 
   svg.on("mousemove touchmove", (event) => {
-    const mouseX = d3.pointer(event, svg.node())[0] + 0.5;
+    const [mouseX] = d3.pointer(event, svg.node());
     rule.attr("x1", mouseX).attr("x2", mouseX);
   });
 
-  // This function draws each band in turn. There is no need to clip, since we’re working on
-  // a canvas.
   function horizon(d) {
     const {context} = this;
     const {length: k} = d;
+
+    // Canvas temizliği
+    context.clearRect(0, 0, width, step);
+
     if (k < width) context.drawImage(this, k, 0, width - k, step, 0, 0, width - k, step);
     context.fillStyle = "#fff";
     context.fillRect(width - k, 0, k, step);
+    
     for (let i = 0; i < bands; ++i) {
       context.save();
-      context.translate(width - k, (i + 1) * step);
+      context.translate(0, i * step);
       context.fillStyle = color(i);
       for (let j = 0; j < k; ++j) {
-        context.fillRect(j, y(d[j]), 1, -y(d[j]));
+        context.fillRect(j, step, 1, -y(d[j]));
       }
       context.restore();
     }
   }
 
+  // Zaman ekseni (X ekseni) için sabit değerler
+  const now = new Date();
+  const then = now.getTime();
+  const period = 1000 * 60 * 60 * 24; // 1 gün için periyod
+
   return Object.assign(div.node(), {
-    update: (data, {then, period}) => {
-      canvas.data(data).each(horizon);
+    update: (newData) => {
+      canvas.data(newData).each(horizon);
       x.domain([then - period * width, then]);
       gX
        .call(d3.axisTop(x).ticks(width / 80).tickSizeOuter(0))
@@ -94,3 +102,6 @@ const chart = (data, width) => {
     }
   });
 }
+
+// Grafiği çalıştırma
+document.body.appendChild(chart());
